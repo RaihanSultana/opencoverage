@@ -925,7 +925,7 @@ function buildHeatmapTile(item, options = {}) {
   const thresholdValue = Number(item.comparison?.thresholdPercent);
   const { compact = false } = options;
 
-  const trendClass = threshold === 'failed' ? 'delta-neg-3' : heatDeltaClass(delta);
+  const trendClass = heatmapTrendClassForComparison({ thresholdStatus: threshold, deltaPercent: delta });
   const size = tileSizeForCoverage(current);
   const classNames = ['heat-tile', trendClass];
 
@@ -957,6 +957,28 @@ function buildHeatmapTile(item, options = {}) {
   btn.title = `${name} | branch=${project.defaultBranch || 'main'} | threshold=${threshold || 'unknown'} | delta=${deltaText}`;
   btn.addEventListener('click', async () => selectProject(project.id));
   return btn;
+}
+
+function heatmapTrendClassForComparison(comparison) {
+  const thresholdStatus = comparison?.thresholdStatus;
+  const delta = Number(comparison?.deltaPercent);
+
+  const thresholdClass = heatmapThresholdTrendClass(thresholdStatus);
+  if (thresholdClass) {
+    return thresholdClass;
+  }
+
+  return heatDeltaClass(delta);
+}
+
+function heatmapThresholdTrendClass(thresholdStatus) {
+  if (thresholdStatus === 'passed') {
+    return 'delta-pos-3';
+  }
+  if (thresholdStatus === 'failed') {
+    return 'delta-neg-3';
+  }
+  return null;
 }
 
 function heatDeltaClass(delta) {
