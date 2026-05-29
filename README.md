@@ -79,6 +79,24 @@ export API_KEY_SECRET="dev-local-key"
 go run ./cmd/api
 ```
 
+Run MCP server locally:
+
+```bash
+export DATABASE_URL="postgres://coverage:coverage@localhost:5432/coverage?sslmode=disable"
+export MCP_SERVER_NAME="opencoverage"
+export MCP_SERVER_VERSION="dev"
+go run ./cmd/mcp
+```
+
+Optional MCP settings:
+
+- `MCP_TRANSPORT` (default `stdio`)
+- `MCP_ENABLE_PROMPTS` (default `true`)
+- `MCP_LOG_LEVEL` (default `info`) - MCP server log verbosity (for example: `debug`, `info`, `warn`, `error`).
+- `MCP_ENABLE_WRITE_TOOLS` (default `false`) - enables `ingest_coverage_run` and `ingest_integration_run`; write tools require a transport that can carry request headers and a non-empty `API_KEY_SECRET` in your shell or deployment environment (for example `export API_KEY_SECRET="dev-local-key"`) before starting `go run ./cmd/mcp`.
+- `MCP_MAX_PAGE_SIZE` (default `100`)
+- `MCP_DEFAULT_RUNS_LIMIT` (default `20`)
+
 Run frontend locally:
 
 ```bash
