@@ -100,6 +100,11 @@ Target the current stable MCP specification supported by major IDE clients at im
 4. `MCP_LOG_LEVEL`
 5. `MCP_ENABLE_PROMPTS` (default `true`)
 
+### 6.3 Runtime Notes
+1. MCP process does not execute database migrations.
+2. API process is the migration owner and must run before MCP on fresh environments.
+3. In local Docker Compose, MCP starts after seed data is applied.
+
 ## 7. Data Exposure Model
 
 ### 7.1 Core Domain Coverage
