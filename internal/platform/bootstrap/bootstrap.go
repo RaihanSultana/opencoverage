@@ -31,15 +31,17 @@ type App struct {
 	ListContributors            *application.ListContributorsUseCase
 }
 
-func New(ctx context.Context, cfg config.Config) (*App, error) {
+func New(ctx context.Context, cfg config.Config, runMigrations bool) (*App, error) {
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := migrations.Up(ctx, cfg.DatabaseURL, cfg.MigrationsDir); err != nil {
-		pool.Close()
-		return nil, err
+	if runMigrations {
+		if err := migrations.Up(ctx, cfg.DatabaseURL, cfg.MigrationsDir); err != nil {
+			pool.Close()
+			return nil, err
+		}
 	}
 
 	if err := pool.Ping(ctx); err != nil {

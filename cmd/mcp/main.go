@@ -46,7 +46,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	app, err := bootstrap.New(ctx, cfg)
+	app, err := bootstrap.New(ctx, cfg, false)
 	if err != nil {
 		slog.Error("startup_failed", "stage", "bootstrap", "error", err)
 		os.Exit(1)

@@ -16,8 +16,5 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 FROM gcr.io/distroless/static-debian12:nonroot
 
 COPY --from=builder /out/mcp /mcp
-COPY --from=builder /src/migrations /app/migrations
-
-WORKDIR /app
 
 ENTRYPOINT ["/mcp"]

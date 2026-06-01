@@ -113,9 +113,6 @@ func (c Config) ValidateMCP() error {
 	if c.DatabaseURL == "" {
 		return fmt.Errorf("database url cannot be empty")
 	}
-	if c.MigrationsDir == "" {
-		return fmt.Errorf("migrations dir cannot be empty")
-	}
 	if c.MCPServerName == "" {
 		return fmt.Errorf("mcp server name cannot be empty")
 	}
