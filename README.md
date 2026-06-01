@@ -6,6 +6,8 @@
 
 ![OpenCoverage dashboard preview 1](imgs/opencov-1.png)
 ![OpenCoverage dashboard preview 2](imgs/opencov-2.png)
+![OpenCoverage dashboard preview 2](imgs/opencov-3.png)
+![OpenCoverage dashboard preview 2](imgs/opencov-4.png)
 
 Self-hosted Go code coverage API and dashboard for ingesting test coverage, comparing deltas, and tracking trends across projects, branches, and teams.
 
