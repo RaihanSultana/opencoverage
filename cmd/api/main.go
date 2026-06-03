@@ -58,6 +58,8 @@ func main() {
 	packageRepo := postgres.NewPackageCoverageRepository(pool)
 	integrationRunRepo := postgres.NewIntegrationTestRunRepository(pool)
 	integrationSpecRepo := postgres.NewIntegrationSpecResultRepository(pool)
+	e2eRunRepo := postgres.NewE2ETestRunRepository(pool)
+	e2eSpecRepo := postgres.NewE2ESpecResultRepository(pool)
 	txManager := postgres.NewTxManager(pool)
 	authenticator := auth.NewEnvAPIKeyAuthenticator(cfg.APIKeySecret)
 
@@ -66,28 +68,38 @@ func main() {
 
 	ingestUC := application.NewIngestCoverageRunUseCase(projectRepo, runRepo, packageRepo, txManager, idGenerator, clockAdapter)
 	ingestIntegrationUC := application.NewIngestIntegrationRunUseCase(projectRepo, integrationRunRepo, integrationSpecRepo, txManager, idGenerator, clockAdapter)
+	ingestE2EUC := application.NewIngestE2ERunUseCase(projectRepo, e2eRunRepo, e2eSpecRepo, txManager, idGenerator, clockAdapter)
 	listProjectsUC := application.NewListProjectsUseCase(projectRepo)
 	getProjectUC := application.NewGetProjectUseCase(projectRepo)
 	listRunsUC := application.NewListCoverageRunsUseCase(runRepo)
 	listIntegrationRunsUC := application.NewListIntegrationRunsUseCase(integrationRunRepo)
+	listE2ERunsUC := application.NewListE2ERunsUseCase(e2eRunRepo)
 	latestComparisonUC := application.NewGetLatestComparisonUseCase(projectRepo, runRepo, packageRepo)
 	latestIntegrationComparisonUC := application.NewGetLatestIntegrationComparisonUseCase(projectRepo, integrationRunRepo, integrationSpecRepo)
+	latestE2EComparisonUC := application.NewGetLatestE2EComparisonUseCase(projectRepo, e2eRunRepo, e2eSpecRepo)
 	getIntegrationRunUC := application.NewGetIntegrationRunUseCase(integrationRunRepo, integrationSpecRepo)
+	getE2ERunUC := application.NewGetE2ERunUseCase(e2eRunRepo, e2eSpecRepo)
 	getIntegrationHeatmapUC := application.NewGetIntegrationHeatmapUseCase(integrationRunRepo)
+	getE2EHeatmapUC := application.NewGetE2EHeatmapUseCase(e2eRunRepo)
 	listBranchesUC := application.NewListBranchesUseCase(runRepo)
 	listContributorsUC := application.NewListContributorsUseCase(projectRepo, runRepo)
 
 	handler := httpadapter.NewHandler(
 		ingestUC,
 		ingestIntegrationUC,
+		ingestE2EUC,
 		listProjectsUC,
 		getProjectUC,
 		listRunsUC,
 		listIntegrationRunsUC,
+		listE2ERunsUC,
 		latestComparisonUC,
+		latestE2EComparisonUC,
 		latestIntegrationComparisonUC,
 		getIntegrationRunUC,
+		getE2ERunUC,
 		getIntegrationHeatmapUC,
+		getE2EHeatmapUC,
 		listBranchesUC,
 		listContributorsUC,
 	)

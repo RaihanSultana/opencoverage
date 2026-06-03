@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -70,7 +71,21 @@ type integrationPayload struct {
 	GinkgoReport  map[string]any `json:"ginkgoReport"`
 }
 
-type integrationUploadResponse struct {
+type e2ePayload struct {
+	ProjectKey    string         `json:"projectKey"`
+	ProjectName   string         `json:"projectName,omitempty"`
+	ProjectGroup  *string        `json:"projectGroup,omitempty"`
+	DefaultBranch string         `json:"defaultBranch,omitempty"`
+	Branch        string         `json:"branch"`
+	CommitSHA     string         `json:"commitSha"`
+	Author        string         `json:"author,omitempty"`
+	TriggerType   string         `json:"triggerType"`
+	RunTimestamp  string         `json:"runTimestamp"`
+	Environment   *string        `json:"environment,omitempty"`
+	TestReport    map[string]any `json:"testReport"`
+}
+
+type uploadResponse struct {
 	Run struct {
 		Status          string  `json:"status"`
 		PassRatePercent float64 `json:"passRatePercent"`
@@ -104,6 +119,9 @@ func main() {
 		switch os.Args[1] {
 		case "integration-upload":
 			runIntegrationUpload(os.Args[2:])
+			return
+		case "e2e-upload":
+			runE2EUpload(os.Args[2:])
 			return
 		case "npm-upload":
 			runNPMUpload(os.Args[2:])
@@ -387,7 +405,7 @@ func runIntegrationUpload(args []string) {
 	fmt.Printf("upload status: %d\n", status)
 	fmt.Printf("upload response: %s\n", strings.TrimSpace(string(respBody)))
 
-	var parsed integrationUploadResponse
+	var parsed uploadResponse
 	if err := json.Unmarshal(respBody, &parsed); err == nil {
 		delta := "-"
 		if parsed.Comparison.DeltaPercent != nil {
@@ -398,6 +416,111 @@ func runIntegrationUpload(args []string) {
 
 	if status >= http.StatusBadRequest {
 		exitErr("upload integration report", fmt.Errorf("server returned status %d", status))
+	}
+}
+
+func runE2EUpload(args []string) {
+	fs := flag.NewFlagSet("e2e-upload", flag.ExitOnError)
+	reportPath := fs.String("e2e-report", "", "Path to e2e JSON report")
+	reportType := fs.String("report-type", "playwright", "E2E report type")
+	apiURL := fs.String("api-url", envOrDefault("API_URL", "http://localhost:8080/v1/e2e-test-runs"), "E2E test API URL")
+	apiKey := fs.String("api-key", os.Getenv("API_KEY"), "API key value")
+	apiKeyHeader := fs.String("api-key-header", "X-API-Key", "API key header name")
+	projectKey := fs.String("project-key", envOrDefault("COVERAGE_PROJECT_KEY", "github.com/arxdsilva/opencoverage"), "Project key")
+	projectName := fs.String("project-name", envOrDefault("COVERAGE_PROJECT_NAME", "coverage-api"), "Project display name")
+	projectGroup := fs.String("project-group", "", "Project group (optional)")
+	defaultBranch := fs.String("default-branch", envOrDefault("COVERAGE_DEFAULT_BRANCH", "main"), "Default branch")
+	branch := fs.String("branch", envOrDefault("COVERAGE_BRANCH", "main"), "Current branch")
+	commitSHA := fs.String("commit-sha", envOrDefault("COVERAGE_COMMIT_SHA", "local"), "Commit SHA")
+	author := fs.String("author", envOrDefault("COVERAGE_AUTHOR", "local"), "Author")
+	triggerType := fs.String("trigger-type", "manual", "Trigger type: push|pr|manual")
+	environment := fs.String("environment", "", "Environment: test|stage|prod (optional)")
+	runTimestamp := fs.String("run-timestamp", time.Now().UTC().Format(time.RFC3339), "Run timestamp (RFC3339)")
+	platformType := fs.String("platform-type", "web", "Platform type: web|android|ios")
+	if err := fs.Parse(args); err != nil {
+		exitErr("parse flags", err)
+	}
+
+	if strings.TrimSpace(*reportPath) == "" {
+		exitErr("validate input", fmt.Errorf("-e2e-report is required"))
+	}
+	if strings.TrimSpace(*apiKey) == "" {
+		exitErr("validate input", fmt.Errorf("-api-key is required (or API_KEY env var)"))
+	}
+	if _, err := time.Parse(time.RFC3339, *runTimestamp); err != nil {
+		exitErr("validate input", fmt.Errorf("run timestamp must be RFC3339: %w", err))
+	}
+
+	rawReport, err := os.ReadFile(*reportPath)
+	if err != nil {
+		exitErr("read e2e report", err)
+	}
+
+	var report map[string]any
+	if err := json.Unmarshal(rawReport, &report); err != nil {
+		exitErr("parse e2e  report json", err)
+	}
+
+	var group *string
+	if *projectGroup != "" {
+		group = projectGroup
+	}
+
+	var env *string
+	if *environment != "" {
+		if *environment != "test" && *environment != "stage" && *environment != "prod" {
+			exitErr("validate input", fmt.Errorf("-environment must be one of: test, stage, prod"))
+		}
+		env = environment
+	}
+
+	// Normalize report structure based on report type
+	var normalizeReport map[string]any
+	switch *reportType {
+	case "playwright":
+		normalizeReport = normalizePlaywrightReport(report)
+	case "appium":
+		normalizeReport = normalizeAppiumReport(report)
+	default:
+		exitErr("validate input", fmt.Errorf("unsupported report type: %s", *reportType))
+	}
+	normalizeReport["platformType"] = *platformType
+
+	payload := e2ePayload{
+		ProjectKey:    *projectKey,
+		ProjectName:   *projectName,
+		ProjectGroup:  group,
+		DefaultBranch: *defaultBranch,
+		Branch:        *branch,
+		CommitSHA:     *commitSHA,
+		Author:        *author,
+		TriggerType:   *triggerType,
+		RunTimestamp:  *runTimestamp,
+		Environment:   env,
+		TestReport:    normalizeReport,
+	}
+
+	body, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		exitErr("marshal payload", err)
+	}
+
+	status, respBody, err := uploadPayload(*apiURL, *apiKeyHeader, *apiKey, body)
+	if err != nil {
+		exitErr("upload report", err)
+	}
+
+	var parsed uploadResponse
+	if err := json.Unmarshal(respBody, &parsed); err == nil {
+		delta := "-"
+		if parsed.Comparison.DeltaPercent != nil {
+			delta = fmt.Sprintf("%.2f", *parsed.Comparison.DeltaPercent)
+		}
+		fmt.Printf("summary: status=%s passRatePercent=%.2f deltaPercent=%s\n", parsed.Run.Status, parsed.Run.PassRatePercent, delta)
+	}
+
+	if status >= http.StatusBadRequest {
+		exitErr("upload report", fmt.Errorf("server returned status %d", status))
 	}
 }
 
@@ -441,6 +564,140 @@ func normalizeReport(raw map[string]any) map[string]any {
 
 	result["specReports"] = normalizedSpecs
 	return result
+}
+
+func normalizePlaywrightReport(raw map[string]any) map[string]any {
+	var suiteDescription string
+	var suitePath string
+	var framework_version string
+
+	result := make(map[string]any)
+	testFramework := "playwright"
+
+	config := firstMap(raw, "config")
+	suites := firstSlice(raw, "suites")
+	if config != nil {
+		suitePath = firstString(config, "rootDir")
+		framework_version = firstString(config, "version")
+	}
+	if len(suites) > 0 {
+		if first, ok := suites[0].(map[string]any); ok {
+			suiteDescription = firstString(first, "title")
+		}
+	}
+	result["suiteDescription"] = suiteDescription
+	result["suitePath"] = suitePath
+	result["reportType"] = &testFramework
+	result["testFramework"] = &testFramework
+	result["frameworkVersion"] = framework_version
+	result["platformType"] = "web"
+
+	// collectSpecs recursively walks Playwright's nested suite tree,
+	// accumulating containerHierarchyTexts as it descends, and normalises each leaf spec
+	var collectSpecs func(suites []any, hierarchy []string) []map[string]any
+	collectSpecs = func(suites []any, hierarchy []string) []map[string]any {
+		var out []map[string]any
+		for _, item := range suites {
+			suiteMap, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			title := firstString(suiteMap, "title")
+			currentHierarchy := hierarchy
+			if title != "" {
+				currentHierarchy = append(append([]string{}, hierarchy...), title)
+			}
+
+			// Recurse into nested suites first.
+			if nested := firstSlice(suiteMap, "suites"); len(nested) > 0 {
+				out = append(out, collectSpecs(nested, currentHierarchy)...)
+			}
+
+			// Normalise leaf specs within this suite.
+			for _, specItem := range firstSlice(suiteMap, "specs") {
+				specMap, ok := specItem.(map[string]any)
+				if !ok {
+					continue
+				}
+
+				// Use the last test result (accounts for retries).
+				tests := firstSlice(specMap, "tests")
+				state := "skipped"
+				runTime := 0.0
+				var failureBlock map[string]any
+
+				if len(tests) > 0 {
+					if testMap, ok := tests[0].(map[string]any); ok {
+						switch firstString(testMap, "status") {
+						case "expected":
+							state = "passed"
+						case "unexpected":
+							state = "failed"
+						case "flaky":
+							state = "flaky"
+						default:
+							state = "skipped"
+						}
+
+						results := firstSlice(testMap, "results")
+						if len(results) > 0 {
+							// Use last result (final retry).
+							if lastResult, ok := results[len(results)-1].(map[string]any); ok {
+								// Playwright reports duration in ms; convert to seconds.
+								runTime = firstFloat(lastResult, "duration") / 1000.0
+
+								if errVal := firstMap(lastResult, "error"); len(errVal) > 0 {
+									failure := map[string]any{
+										"message": stripANSI(firstString(errVal, "message")),
+									}
+									if locVal := firstMap(errVal, "location"); len(locVal) > 0 {
+										failure["location"] = map[string]any{
+											"fileName":   firstString(locVal, "file"),
+											"lineNumber": int(firstFloat(locVal, "line")),
+										}
+									}
+									failureBlock = failure
+								}
+							}
+						}
+					}
+				}
+
+				hierarchyCopy := make([]any, len(currentHierarchy))
+				for i, h := range currentHierarchy {
+					hierarchyCopy[i] = h
+				}
+
+				normalized := map[string]any{
+					"leafNodeText":            firstString(specMap, "title"),
+					"containerHierarchyTexts": hierarchyCopy,
+					"state":                   state,
+					"runTime":                 runTime,
+				}
+				if failureBlock != nil {
+					normalized["failure"] = failureBlock
+				}
+				out = append(out, normalized)
+			}
+		}
+		return out
+	}
+
+	result["specReports"] = collectSpecs(suites, nil)
+	return result
+}
+
+func normalizeAppiumReport(raw map[string]any) map[string]any {
+	// not implemented yet
+	exitErr("normalize report", fmt.Errorf("appium report normalization not implemented yet"))
+	return nil
+}
+
+// stripANSI removes ANSI escape codes from a string.
+// This is useful to clean up error messages from Playwright which may include ANSI codes for coloring.
+func stripANSI(s string) string {
+	ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	return ansiRegex.ReplaceAllString(s, "")
 }
 
 func firstString(src map[string]any, keys ...string) string {
