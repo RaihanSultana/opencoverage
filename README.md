@@ -6,6 +6,8 @@
 
 ![OpenCoverage dashboard preview 1](imgs/opencov-1.png)
 ![OpenCoverage dashboard preview 2](imgs/opencov-2.png)
+![OpenCoverage dashboard preview 2](imgs/opencov-3.png)
+![OpenCoverage dashboard preview 2](imgs/opencov-4.png)
 
 Self-hosted Go code coverage API and dashboard for ingesting test coverage, comparing deltas, and tracking trends across projects, branches, and teams.
 
@@ -31,7 +33,7 @@ Self-hosted Go code coverage API and dashboard for ingesting test coverage, comp
 
 ## Quick Start (Docker Compose)
 
-Run the full local stack (PostgreSQL + migrations + API + frontend):
+Run the full local stack (PostgreSQL + API + seed + frontend + MCP):
 
 ```bash
 make compose-up
@@ -49,6 +51,14 @@ Access services:
 - Frontend dashboard: `http://localhost:8090`
 - Health check: `http://localhost:8080/healthz`
 
+Compose startup behavior:
+
+1. `db` starts first and must pass its healthcheck.
+2. `api` starts next and runs all DB migrations during startup.
+3. `api` exposes `/healthz` only after startup completes.
+4. `seed` runs only after `api` is healthy.
+5. `mcp` starts after `seed` completes successfully.
+
 Stop the stack:
 
 ```bash
@@ -65,7 +75,7 @@ Requirements:
 Core environment variables:
 
 - `DATABASE_URL` (required)
-- `MIGRATIONS_DIR` (default `./migrations`)
+- `MIGRATIONS_DIR` (default `./migrations`, used by API startup migrations)
 - `API_KEY_SECRET` (required)
 - `SERVER_ADDR` (default `:8080`)
 - `API_KEY_HEADER` (default `X-API-Key`)
@@ -78,6 +88,28 @@ export DATABASE_URL="postgres://coverage:coverage@localhost:5432/coverage?sslmod
 export API_KEY_SECRET="dev-local-key"
 go run ./cmd/api
 ```
+
+`cmd/api` runs migrations on startup before serving HTTP traffic.
+
+Run MCP server locally:
+
+```bash
+export DATABASE_URL="postgres://coverage:coverage@localhost:5432/coverage?sslmode=disable"
+export MCP_SERVER_NAME="opencoverage"
+export MCP_SERVER_VERSION="dev"
+go run ./cmd/mcp
+```
+
+`cmd/mcp` does not run migrations. Start the API first (or run `make migrate-up`) before starting MCP against a fresh database.
+
+Optional MCP settings:
+
+- `MCP_TRANSPORT` (default `stdio`)
+- `MCP_ENABLE_PROMPTS` (default `true`)
+- `MCP_LOG_LEVEL` (default `info`) - MCP server log verbosity (for example: `debug`, `info`, `warn`, `error`).
+- `MCP_ENABLE_WRITE_TOOLS` (default `false`) - enables `ingest_coverage_run` and `ingest_integration_run`; write tools require a transport that can carry request headers and a non-empty `API_KEY_SECRET` in your shell or deployment environment (for example `export API_KEY_SECRET="dev-local-key"`) before starting `go run ./cmd/mcp`.
+- `MCP_MAX_PAGE_SIZE` (default `100`)
+- `MCP_DEFAULT_RUNS_LIMIT` (default `20`)
 
 Run frontend locally:
 
@@ -224,6 +256,12 @@ This project follows Hexagonal Architecture (ports and adapters):
 ## Database and Migrations
 
 Migration files are in `migrations/`.
+
+Migration ownership:
+
+1. API process owns automatic migration execution at startup.
+2. MCP and frontend processes never run migrations.
+3. In Docker Compose, `seed` waits for API health so seeding happens after migrations.
 
 Common commands:
 
