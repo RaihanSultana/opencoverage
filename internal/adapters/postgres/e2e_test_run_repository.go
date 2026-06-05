@@ -266,7 +266,7 @@ func (r *E2ETestRunRepository) ListByProject(ctx context.Context, projectID stri
 
 	rows, err := q.Query(ctx, listSQL, args...)
 	if err != nil {
-		return nil, 0, fmt.Errorf("list integration runs: %w", err)
+		return nil, 0, fmt.Errorf("list e2e runs: %w", err)
 	}
 	defer rows.Close()
 
@@ -299,13 +299,13 @@ func (r *E2ETestRunRepository) ListByProject(ctx context.Context, projectID stri
 			&run.Environment,
 			&run.CreatedAt,
 		); err != nil {
-			return nil, 0, fmt.Errorf("scan integration run: %w", err)
+			return nil, 0, fmt.Errorf("scan e2e run: %w", err)
 		}
 		runs = append(runs, run)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("iterate integration run rows: %w", err)
+		return nil, 0, fmt.Errorf("iterate e2e run rows: %w", err)
 	}
 
 	return runs, total, nil

@@ -122,7 +122,7 @@ func (r *E2ESpecResultRepository) ListFailedByRunID(ctx context.Context, runID s
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate failed integration spec rows: %w", err)
+		return nil, fmt.Errorf("iterate failed e2e spec rows: %w", err)
 	}
 
 	return specs, nil

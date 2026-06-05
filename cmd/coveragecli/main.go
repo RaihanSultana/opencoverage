@@ -457,7 +457,7 @@ func runE2EUpload(args []string) {
 
 	var report map[string]any
 	if err := json.Unmarshal(rawReport, &report); err != nil {
-		exitErr("parse e2e  report json", err)
+		exitErr("parse e2e report json", err)
 	}
 
 	var group *string
@@ -597,6 +597,7 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 	var collectSpecs func(suites []any, hierarchy []string) []map[string]any
 	collectSpecs = func(suites []any, hierarchy []string) []map[string]any {
 		var out []map[string]any
+		// iterates over all the suites branches at the current level
 		for _, item := range suites {
 			suiteMap, ok := item.(map[string]any)
 			if !ok {
@@ -610,7 +611,9 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 				currentHierarchy = append(append([]string{}, hierarchy...), title)
 			}
 
-			// Recurse into nested suites first.
+			// Recurse into nested suites leaves first. 
+			// as the suites can be nested N level deep
+			// uses recursive calls to collect all leaf specs
 			if nested := firstSlice(suiteMap, "suites"); len(nested) > 0 {
 				out = append(out, collectSpecs(nested, currentHierarchy)...)
 			}
@@ -686,7 +689,6 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 		}
 		return out
 	}
-
 	result["specReports"] = collectSpecs(suites, nil)
 	return result
 }

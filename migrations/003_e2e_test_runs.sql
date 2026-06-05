@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS e2e_test_runs (
   run_timestamp TIMESTAMPTZ NOT NULL,
   framework_version TEXT,
   test_framework TEXT,
-  platform TEXT -- either web, android, or ios
+  platform TEXT, -- either web, android, or ios
   suite_description TEXT NOT NULL,
   suite_path TEXT NOT NULL,
   total_specs INTEGER NOT NULL,
@@ -54,5 +54,5 @@ CREATE INDEX IF NOT EXISTS e2e_test_spec_results_state_idx ON e2e_test_spec_resu
 -- +goose Down
 DROP TABLE IF EXISTS e2e_test_spec_results;
 DROP TABLE IF EXISTS e2e_test_runs;
-DROP TYPE IF EXISTS environment_type;
-DROP TYPE IF EXISTS platform_type;
+DROP TABLE IF EXISTS e2e_test_spec_results;
+DROP TABLE IF EXISTS e2e_test_runs;
