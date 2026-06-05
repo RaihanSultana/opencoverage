@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"sort"
 	"strings"
 	"time"
@@ -177,6 +176,7 @@ func (uc *IngestE2ERunUseCase) Execute(ctx context.Context, in IngestE2ERunInput
 			ID:                     project.ID,
 			ProjectKey:             project.ProjectKey,
 			Name:                   project.Name,
+			Group:                  project.Group,
 			DefaultBranch:          project.DefaultBranch,
 			GlobalThresholdPercent: project.GlobalThresholdPercent,
 			Created:                created,
@@ -194,7 +194,6 @@ func (uc *IngestE2ERunUseCase) Execute(ctx context.Context, in IngestE2ERunInput
 
 func (uc *IngestE2ERunUseCase) resolveOrCreateE2EProject(ctx context.Context, in IngestE2ERunInput) (domain.Project, bool, error) {
 	project, err := uc.projects.GetByKey(ctx, in.ProjectKey)
-	log.Printf("resolveOrCreateE2EProject: GetByKey result: project=%+v, err=%v\n", project, err)
 	if err == nil {
 		return project, false, nil
 	}
@@ -347,12 +346,12 @@ func validateE2EIngestInput(in IngestE2ERunInput) error {
 	if err := domain.ValidateTriggerType(in.TriggerType); err != nil {
 		return NewInvalidArgument(err.Error(), map[string]any{"field": "triggerType"})
 	}
-	// if strings.TrimSpace(in.TestReport.SuiteDescription) == "" {
-	// 	return NewInvalidArgument("testReport.suiteDescription is required", map[string]any{"field": "testReport.suiteDescription"})
-	// }
-	// if strings.TrimSpace(in.TestReport.SuitePath) == "" {
-	// 	return NewInvalidArgument("testReport.suitePath is required", map[string]any{"field": "testReport.suitePath"})
-	// }
+	if strings.TrimSpace(in.TestReport.SuiteDescription) == "" {
+		return NewInvalidArgument("testReport.suiteDescription is required", map[string]any{"field": "testReport.suiteDescription"})
+	}
+	if strings.TrimSpace(in.TestReport.SuitePath) == "" {
+		return NewInvalidArgument("testReport.suitePath is required", map[string]any{"field": "testReport.suitePath"})
+	}
 	if strings.TrimSpace(in.TestReport.FrameworkVersion) == "" {
 		return NewInvalidArgument("testReport.frameworkVersion is required", map[string]any{"field": "testReport.frameworkVersion"})
 	}
@@ -516,8 +515,8 @@ func (uc *ListE2ERunsUseCase) Execute(ctx context.Context, in ListE2ERunsInput) 
 		return ListE2ERunsOutput{}, NewInvalidArgument("status must be passed or failed", map[string]any{"field": "status"})
 	}
 	environment := strings.ToLower(strings.TrimSpace(in.Environment))
-	if environment != "" && environment != "test" && environment != "stage" && environment != "prod" && environment != "none" {
-		return ListE2ERunsOutput{}, NewInvalidArgument("environment must be one of: test, stage, prod, none", map[string]any{"field": "environment"})
+	if environment != "" && environment != "test" && environment != "stage" && environment != "prod" {
+		return ListE2ERunsOutput{}, NewInvalidArgument("environment must be one of: test, stage, prod", map[string]any{"field": "environment"})
 	}
 
 	runs, total, err := uc.runs.ListByProject(ctx, in.ProjectID, in.Branch, status, environment, in.From, in.To, page, pageSize)
@@ -611,6 +610,7 @@ func (uc *GetLatestE2EComparisonUseCase) Execute(ctx context.Context, projectID 
 			ID:                     project.ID,
 			ProjectKey:             project.ProjectKey,
 			Name:                   project.Name,
+			Group:                  project.Group,
 			DefaultBranch:          project.DefaultBranch,
 			GlobalThresholdPercent: project.GlobalThresholdPercent,
 			Created:                false,

@@ -593,6 +593,7 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 
 	// collectSpecs recursively walks Playwright's nested suite tree,
 	// accumulating containerHierarchyTexts as it descends, and normalises each leaf spec
+	// Suites can be nested N level deep and leaf specs can be at any level, so we need to recurse fully to find all specs and get their full hierarchy.
 	var collectSpecs func(suites []any, hierarchy []string) []map[string]any
 	collectSpecs = func(suites []any, hierarchy []string) []map[string]any {
 		var out []map[string]any
@@ -603,6 +604,8 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 			}
 			title := firstString(suiteMap, "title")
 			currentHierarchy := hierarchy
+			// appends hierarchy with current suite title if it exists
+			// coppies all elements from hierarchy into new slice to avoid mutating the original slice in recursive calls
 			if title != "" {
 				currentHierarchy = append(append([]string{}, hierarchy...), title)
 			}
@@ -616,6 +619,7 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 			for _, specItem := range firstSlice(suiteMap, "specs") {
 				specMap, ok := specItem.(map[string]any)
 				if !ok {
+					fmt.Printf("warning: skipping spec with unexpected structure: %v\n", specItem)
 					continue
 				}
 
@@ -662,6 +666,7 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 					}
 				}
 
+				// copies currentHierarchy into new slice to avoid mutating the original slice in recursive calls
 				hierarchyCopy := make([]any, len(currentHierarchy))
 				for i, h := range currentHierarchy {
 					hierarchyCopy[i] = h
