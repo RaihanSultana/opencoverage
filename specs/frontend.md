@@ -236,6 +236,9 @@ make compose-up
 
 Services started by compose:
 
+- Database (`db`) first
+- API (`api`) after DB healthcheck, with migrations run during API startup
+- Seed (`seed`) after API healthcheck (`/healthz`)
 - API on `http://localhost:8080`
 - Frontend on `http://localhost:8090`
 
