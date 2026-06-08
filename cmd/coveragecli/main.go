@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -190,7 +191,7 @@ func runNPMUpload(args []string) {
 		thresh = threshold
 	}
 
-	fmt.Printf("summary: metric=%s totalCoveragePercent=%.2f consideredFiles=%d generatedPackages=%d\n", *metric, total, consideredFiles, len(packages))
+	slog.Info("summary", "metric", *metric, "totalCoveragePercent", total, "consideredFiles", consideredFiles, "generatedPackages", len(packages))
 
 	payload := ingestPayload{
 		ProjectKey:           *projectKey,
@@ -220,7 +221,7 @@ func runNPMUpload(args []string) {
 		if err := os.WriteFile(payloadOut, body, 0o644); err != nil {
 			exitErr("write payload", err)
 		}
-		fmt.Printf("payload written: %s\n", payloadOut)
+		slog.Info("payload written", "path", payloadOut)
 	}
 
 	if *dryRun {
@@ -237,8 +238,8 @@ func runNPMUpload(args []string) {
 		exitErr("upload", fmt.Errorf("ERR_UPLOAD_FAILED: %w", err))
 	}
 
-	fmt.Printf("upload status: %d\n", status)
-	fmt.Printf("upload response: %s\n", strings.TrimSpace(string(respBody)))
+	slog.Info("upload status", "status", status)
+	slog.Info("upload response", "response", strings.TrimSpace(string(respBody)))
 
 	if status >= http.StatusBadRequest {
 		exitErr("upload", fmt.Errorf("ERR_UPLOAD_FAILED: server returned status %d", status))
@@ -307,7 +308,7 @@ func runCoverageUpload(args []string) {
 	if err := os.WriteFile(*out, body, 0o644); err != nil {
 		exitErr("write payload file", err)
 	}
-	fmt.Printf("payload written: %s\n", *out)
+	slog.Info("payload written", "path", *out)
 
 	if !*upload {
 		return
@@ -320,8 +321,9 @@ func runCoverageUpload(args []string) {
 	if err != nil {
 		exitErr("upload", err)
 	}
-	fmt.Printf("upload status: %d\n", status)
-	fmt.Printf("upload response: %s\n", strings.TrimSpace(string(respBody)))
+
+	slog.Info("upload status", "status", status)
+	slog.Info("upload response", "response", strings.TrimSpace(string(respBody)))
 }
 
 func runIntegrationUpload(args []string) {
@@ -401,8 +403,8 @@ func runIntegrationUpload(args []string) {
 		exitErr("upload integration report", err)
 	}
 
-	fmt.Printf("upload status: %d\n", status)
-	fmt.Printf("upload response: %s\n", strings.TrimSpace(string(respBody)))
+	slog.Info("upload status", "status", status)
+	slog.Info("upload response", "response", strings.TrimSpace(string(respBody)))
 
 	var parsed uploadResponse
 	if err := json.Unmarshal(respBody, &parsed); err == nil {
@@ -410,7 +412,7 @@ func runIntegrationUpload(args []string) {
 		if parsed.Comparison.DeltaPercent != nil {
 			delta = fmt.Sprintf("%.2f", *parsed.Comparison.DeltaPercent)
 		}
-		fmt.Printf("summary: status=%s passRatePercent=%.2f deltaPercent=%s\n", parsed.Run.Status, parsed.Run.PassRatePercent, delta)
+		slog.Info("summary", "status", parsed.Run.Status, "passRatePercent", parsed.Run.PassRatePercent, "deltaPercent", delta)
 	}
 
 	if status >= http.StatusBadRequest {
@@ -515,7 +517,7 @@ func runE2EUpload(args []string) {
 		if parsed.Comparison.DeltaPercent != nil {
 			delta = fmt.Sprintf("%.2f", *parsed.Comparison.DeltaPercent)
 		}
-		fmt.Printf("summary: status=%s passRatePercent=%.2f deltaPercent=%s\n", parsed.Run.Status, parsed.Run.PassRatePercent, delta)
+		slog.Info("summary", "status", parsed.Run.Status, "passRatePercent", parsed.Run.PassRatePercent, "deltaPercent", delta)
 	}
 
 	if status >= http.StatusBadRequest {
@@ -611,7 +613,7 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 				currentHierarchy = append(append([]string{}, hierarchy...), title)
 			}
 
-			// Recurse into nested suites leaves first. 
+			// Recurse into nested suites leaves first.
 			// as the suites can be nested N level deep
 			// uses recursive calls to collect all leaf specs
 			if nested := firstSlice(suiteMap, "suites"); len(nested) > 0 {
@@ -622,7 +624,7 @@ func normalizePlaywrightReport(raw map[string]any) map[string]any {
 			for _, specItem := range firstSlice(suiteMap, "specs") {
 				specMap, ok := specItem.(map[string]any)
 				if !ok {
-					fmt.Printf("warning: skipping spec with unexpected structure: %v\n", specItem)
+					slog.Warn("skipping spec with unexpected structure", "specItem", specItem)
 					continue
 				}
 

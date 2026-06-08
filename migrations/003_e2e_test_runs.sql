@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS e2e_test_runs (
   run_timestamp TIMESTAMPTZ NOT NULL,
   framework_version TEXT,
   test_framework TEXT,
-  platform TEXT, -- either web, android, or ios
+  platform TEXT CHECK (platform IN ('web', 'android', 'ios')), -- either web, android, or ios
   suite_description TEXT NOT NULL,
   suite_path TEXT NOT NULL,
   total_specs INTEGER NOT NULL,
