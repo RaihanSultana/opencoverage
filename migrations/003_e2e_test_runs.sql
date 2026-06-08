@@ -54,5 +54,3 @@ CREATE INDEX IF NOT EXISTS e2e_test_spec_results_state_idx ON e2e_test_spec_resu
 -- +goose Down
 DROP TABLE IF EXISTS e2e_test_spec_results;
 DROP TABLE IF EXISTS e2e_test_runs;
-DROP TABLE IF EXISTS e2e_test_spec_results;
-DROP TABLE IF EXISTS e2e_test_runs;
